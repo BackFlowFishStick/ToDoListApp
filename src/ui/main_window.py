@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QListWidget, QListWidgetItem, QLabel,
     QFrame
 )
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtGui import QMouseEvent, QFontMetrics
 
 from src.models.task import Task
 from src.ui.styles import MAIN_STYLE
@@ -17,7 +17,6 @@ class TaskItemWidget(QWidget):
     """单个任务项的控件：勾选按钮 + 文字 + 删除按钮 + 可展开详情"""
 
     ITEM_BASE_HEIGHT = 40
-    DETAIL_HEIGHT = 80
 
     def __init__(self, task: Task, on_toggle, on_delete, on_item_resize, parent=None):
         super().__init__(parent)
@@ -139,8 +138,20 @@ class TaskItemWidget(QWidget):
             QLabel.mousePressEvent(self.label, event)
 
     def sizeHint(self):
-        h = self.ITEM_BASE_HEIGHT + (self.DETAIL_HEIGHT if self._expanded else 0)
-        return QSize(0, h)
+        if not self._expanded:
+            return QSize(0, self.ITEM_BASE_HEIGHT)
+        # 动态计算详情面板所需高度
+        fm = QFontMetrics(self.detail_text.font())
+        avail_w = self.width() - 28  # 左右 margin 14*2
+        if avail_w <= 0:
+            avail_w = 300
+        text_h = fm.boundingRect(0, 0, avail_w, 0,
+                                 Qt.TextWordWrap, self.detail_text.text()).height()
+        desc_h = fm.boundingRect(0, 0, avail_w, 0,
+                                 Qt.TextWordWrap, self.detail_desc.text()).height()
+        time_h = fm.height()
+        detail_h = text_h + desc_h + time_h + 24  # 24 = padding + spacing
+        return QSize(0, self.ITEM_BASE_HEIGHT + detail_h)
 
     def minimumSizeHint(self):
         return self.sizeHint()
