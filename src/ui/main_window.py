@@ -100,25 +100,24 @@ class TaskItemWidget(QWidget):
             self._on_toggle(self.task.id, self.task.completed)
 
     def _update_style(self):
+        font = self.label.font()
         if self.task.completed:
             self.label.setStyleSheet("""
                 background: transparent;
                 border: none;
                 color: #585b70;
-                text-decoration: line-through;
             """)
-            font = self.label.font()
             font.setItalic(True)
-            self.label.setFont(font)
+            font.setStrikeOut(True)
         else:
             self.label.setStyleSheet("""
                 background: transparent;
                 border: none;
                 color: #cdd6f4;
             """)
-            font = self.label.font()
             font.setItalic(False)
-            self.label.setFont(font)
+            font.setStrikeOut(False)
+        self.label.setFont(font)
 
 
 class MainWindow(QWidget):
