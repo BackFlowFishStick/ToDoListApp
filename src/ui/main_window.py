@@ -2,16 +2,16 @@ from PyQt5.QtCore import Qt, QPoint, QSize
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QListWidget, QListWidgetItem, QLabel,
-    QFrame
+    QCheckBox, QFrame
 )
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtGui import QFont, QMouseEvent
 
 from src.models.task import Task
 from src.ui.styles import MAIN_STYLE
 
 
 class TaskItemWidget(QWidget):
-    """单个任务项的控件：勾选按钮 + 文字 + 删除按钮"""
+    """单个任务项的控件：复选框 + 文字 + 删除按钮"""
 
     def __init__(self, task: Task, on_toggle, on_delete, parent=None):
         super().__init__(parent)
@@ -20,54 +20,42 @@ class TaskItemWidget(QWidget):
         self._on_delete = on_delete
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(6)
 
-        # 勾选按钮 —— 点击切换 ☐ / ☑
-        self.check_btn = QPushButton()
-        self.check_btn.setFixedSize(20, 20)
-        self.check_btn.setCheckable(True)
-        self.check_btn.setChecked(task.completed)
-        self.check_btn.clicked.connect(self._handle_toggle)
-        self.check_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: 2px solid #585b70;
-                border-radius: 10px;
-                color: transparent;
-                font-size: 12px;
-                font-weight: bold;
+        self.checkbox = QCheckBox()
+        self.checkbox.setChecked(task.completed)
+        self.checkbox.stateChanged.connect(self._handle_toggle)
+        self.checkbox.setStyleSheet("""
+            QCheckBox::indicator {
+                width: 18px; height: 18px;
+                border: 2px solid #45475a;
+                border-radius: 5px;
+                background: #313244;
             }
-            QPushButton:checked {
+            QCheckBox::indicator:checked {
                 background: #a6e3a1;
                 border-color: #a6e3a1;
-                color: #1e1e2e;
             }
-            QPushButton:hover {
+            QCheckBox::indicator:hover {
                 border-color: #89b4fa;
             }
-            QPushButton:checked:hover {
-                background: #94d89a;
-                border-color: #94d89a;
-            }
         """)
-        self._update_check_btn_text()
 
         self.label = QLabel(task.text)
         self.label.setWordWrap(True)
         self.label.setStyleSheet("background: transparent; border: none;")
 
-        self.del_btn = QPushButton("\u00d7")
-        self.del_btn.setFixedSize(20, 20)
+        self.del_btn = QPushButton("\u00d7")  # × 符号
+        self.del_btn.setFixedSize(24, 24)
         self.del_btn.setStyleSheet("""
             QPushButton {
                 background: transparent;
                 border: none;
                 color: #6c7086;
-                font-size: 16px;
+                font-size: 18px;
                 font-weight: bold;
-                border-radius: 10px;
-                padding-bottom: 2px;
+                border-radius: 12px;
             }
             QPushButton:hover {
                 background: #f38ba8;
@@ -76,22 +64,14 @@ class TaskItemWidget(QWidget):
         """)
         self.del_btn.clicked.connect(lambda: self._on_delete(self.task.id))
 
-        layout.addWidget(self.check_btn, alignment=Qt.AlignVCenter)
-        layout.addWidget(self.label, stretch=1, alignment=Qt.AlignVCenter)
-        layout.addWidget(self.del_btn, alignment=Qt.AlignVCenter)
+        layout.addWidget(self.checkbox)
+        layout.addWidget(self.label, stretch=1)
+        layout.addWidget(self.del_btn)
 
-        self.setMinimumHeight(40)
         self._update_style()
 
-    def sizeHint(self):
-        return QSize(0, 40)
-
-    def _update_check_btn_text(self):
-        self.check_btn.setText("\u2713" if self.task.completed else "")
-
-    def _handle_toggle(self):
-        self.task.completed = self.check_btn.isChecked()
-        self._update_check_btn_text()
+    def _handle_toggle(self, state):
+        self.task.completed = (state == Qt.Checked)
         self._update_style()
         if self._on_toggle:
             self._on_toggle(self.task.id, self.task.completed)
