@@ -17,7 +17,7 @@ class TaskItemWidget(QWidget):
     """单个任务项的控件：勾选按钮 + 文字 + 删除按钮 + 可展开详情"""
 
     ITEM_BASE_HEIGHT = 40
-    DETAIL_HEIGHT = 60
+    DETAIL_HEIGHT = 80
 
     def __init__(self, task: Task, on_toggle, on_delete, on_item_resize, parent=None):
         super().__init__(parent)
@@ -116,11 +116,15 @@ class TaskItemWidget(QWidget):
         detail_layout.setContentsMargins(14, 8, 14, 8)
         detail_layout.setSpacing(4)
 
-        self.detail_text = QLabel(f"任务内容: {task.text}")
+        self.detail_text = QLabel(f"任务: {task.text}")
         self.detail_text.setWordWrap(True)
-        self.detail_time = QLabel(f"创建时间: {task.created_at}")
+        desc = task.description or "（无）"
+        self.detail_desc = QLabel(f"备注: {desc}")
+        self.detail_desc.setWordWrap(True)
+        self.detail_time = QLabel(f"创建: {task.created_at}")
 
         detail_layout.addWidget(self.detail_text)
+        detail_layout.addWidget(self.detail_desc)
         detail_layout.addWidget(self.detail_time)
         outer.addWidget(self.detail_frame)
 
@@ -222,20 +226,32 @@ class MainWindow(QWidget):
         # --- 输入区域 ---
         input_frame = QFrame()
         input_frame.setObjectName("inputFrame")
-        if_layout = QHBoxLayout(input_frame)
+        if_layout = QVBoxLayout(input_frame)
         if_layout.setContentsMargins(10, 8, 10, 8)
-        if_layout.setSpacing(0)
+        if_layout.setSpacing(6)
+
+        # 第一行：任务名 + 添加按钮
+        name_row = QHBoxLayout()
+        name_row.setSpacing(6)
 
         self.input = QLineEdit()
-        self.input.setPlaceholderText("输入新任务...")
+        self.input.setPlaceholderText("任务名称...")
         self.input.returnPressed.connect(self._add_task)
 
         self.add_btn = QPushButton("添加")
         self.add_btn.setObjectName("addBtn")
         self.add_btn.clicked.connect(self._add_task)
 
-        if_layout.addWidget(self.input, stretch=1)
-        if_layout.addWidget(self.add_btn)
+        name_row.addWidget(self.input, stretch=1)
+        name_row.addWidget(self.add_btn)
+        if_layout.addLayout(name_row)
+
+        # 第二行：备注（可选）
+        self.desc_input = QLineEdit()
+        self.desc_input.setPlaceholderText("备注（可选）...")
+        self.desc_input.returnPressed.connect(self._add_task)
+        if_layout.addWidget(self.desc_input)
+
         root.addWidget(input_frame)
 
         # --- 任务列表 ---
@@ -274,10 +290,12 @@ class MainWindow(QWidget):
         if not text:
             return
 
-        task = Task.create(text)
+        description = self.desc_input.text().strip()
+        task = Task.create(text, description)
         self._tasks[task.id] = task
         self._insert_item(task)
         self.input.clear()
+        self.desc_input.clear()
         self.input.setFocus()
         self._save_tasks()
 
@@ -325,6 +343,7 @@ class MainWindow(QWidget):
             tasks_data.append({
                 "id": task.id,
                 "text": task.text,
+                "description": task.description,
                 "completed": task.completed,
                 "created_at": task.created_at,
             })
@@ -341,6 +360,7 @@ class MainWindow(QWidget):
             task = Task(
                 id=item["id"],
                 text=item["text"],
+                description=item.get("description", ""),
                 completed=item["completed"],
                 created_at=item.get("created_at", ""),
             )
