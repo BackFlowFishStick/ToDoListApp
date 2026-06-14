@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import uuid4
 
 
@@ -6,8 +7,10 @@ from uuid import uuid4
 class Task:
     id: str
     text: str
+    description: str = ""
     completed: bool = False
+    created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M"))
 
     @classmethod
-    def create(cls, text: str) -> "Task":
-        return cls(id=uuid4().hex, text=text.strip())
+    def create(cls, text: str, description: str = "") -> "Task":
+        return cls(id=uuid4().hex, text=text.strip(), description=description.strip())
