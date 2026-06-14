@@ -14,19 +14,29 @@ from src.ui.styles import MAIN_STYLE
 
 
 class TaskItemWidget(QWidget):
-    """单个任务项的控件：勾选按钮 + 文字 + 删除按钮"""
+    """单个任务项的控件：勾选按钮 + 文字 + 删除按钮 + 可展开详情"""
 
-    def __init__(self, task: Task, on_toggle, on_delete, parent=None):
+    ITEM_BASE_HEIGHT = 40
+    DETAIL_HEIGHT = 60
+
+    def __init__(self, task: Task, on_toggle, on_delete, on_item_resize, parent=None):
         super().__init__(parent)
         self.task = task
         self._on_toggle = on_toggle
         self._on_delete = on_delete
+        self._on_item_resize = on_item_resize
+        self._expanded = False
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 12)
-        layout.setSpacing(8)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        # 勾选按钮 —— 点击切换 ☐ / ☑
+        # ── 主行 ──
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(8, 4, 8, 12)
+        row_layout.setSpacing(8)
+
         self.check_btn = QPushButton()
         self.check_btn.setFixedSize(20, 20)
         self.check_btn.setCheckable(True)
@@ -59,6 +69,8 @@ class TaskItemWidget(QWidget):
         self.label = QLabel(task.text)
         self.label.setWordWrap(True)
         self.label.setStyleSheet("background: transparent; border: none;")
+        self.label.setCursor(Qt.PointingHandCursor)
+        self.label.mousePressEvent = self._on_label_click
 
         self.del_btn = QPushButton("\u00d7")
         self.del_btn.setFixedSize(20, 20)
@@ -79,15 +91,55 @@ class TaskItemWidget(QWidget):
         """)
         self.del_btn.clicked.connect(lambda: self._on_delete(self.task.id))
 
-        layout.addWidget(self.check_btn, alignment=Qt.AlignVCenter)
-        layout.addWidget(self.label, stretch=1, alignment=Qt.AlignVCenter)
-        layout.addWidget(self.del_btn, alignment=Qt.AlignVCenter)
+        row_layout.addWidget(self.check_btn, alignment=Qt.AlignVCenter)
+        row_layout.addWidget(self.label, stretch=1, alignment=Qt.AlignVCenter)
+        row_layout.addWidget(self.del_btn, alignment=Qt.AlignVCenter)
+        outer.addWidget(row)
 
-        self.setMinimumHeight(40)
+        # ── 详情面板（默认隐藏）──
+        self.detail_frame = QFrame()
+        self.detail_frame.setStyleSheet("""
+            QFrame {
+                background: #11111b;
+                border-top: 1px solid #313244;
+                border-radius: 0 0 8px 8px;
+            }
+            QLabel {
+                background: transparent;
+                border: none;
+                color: #a6adc8;
+                font-size: 12px;
+            }
+        """)
+        self.detail_frame.setVisible(False)
+        detail_layout = QVBoxLayout(self.detail_frame)
+        detail_layout.setContentsMargins(14, 8, 14, 8)
+        detail_layout.setSpacing(4)
+
+        self.detail_text = QLabel(f"任务内容: {task.text}")
+        self.detail_text.setWordWrap(True)
+        self.detail_time = QLabel(f"创建时间: {task.created_at}")
+
+        detail_layout.addWidget(self.detail_text)
+        detail_layout.addWidget(self.detail_time)
+        outer.addWidget(self.detail_frame)
+
+        self.setMinimumHeight(self.ITEM_BASE_HEIGHT)
         self._update_style()
 
+    def _on_label_click(self, event):
+        self._expanded = not self._expanded
+        self.detail_frame.setVisible(self._expanded)
+        self._on_item_resize()
+        if event:
+            QLabel.mousePressEvent(self.label, event)
+
     def sizeHint(self):
-        return QSize(0, 40)
+        h = self.ITEM_BASE_HEIGHT + (self.DETAIL_HEIGHT if self._expanded else 0)
+        return QSize(0, h)
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
 
     def _update_check_btn_text(self):
         self.check_btn.setText("\u2713" if self.task.completed else "")
@@ -235,10 +287,15 @@ class MainWindow(QWidget):
             task,
             on_toggle=self._on_task_toggle,
             on_delete=self._delete_task,
+            on_item_resize=lambda: self._resize_item(item, widget),
         )
         item.setSizeHint(widget.sizeHint())
         self.list_widget.addItem(item)
         self.list_widget.setItemWidget(item, widget)
+
+    def _resize_item(self, item: QListWidgetItem, widget: TaskItemWidget):
+        item.setSizeHint(widget.sizeHint())
+        self.list_widget.doItemsLayout()
 
     def _on_task_toggle(self, task_id: str, completed: bool):
         if task_id in self._tasks:
@@ -269,6 +326,7 @@ class MainWindow(QWidget):
                 "id": task.id,
                 "text": task.text,
                 "completed": task.completed,
+                "created_at": task.created_at,
             })
         with open(self._get_data_path(), "w", encoding="utf-8") as f:
             json.dump(tasks_data, f, ensure_ascii=False, indent=2)
@@ -280,6 +338,11 @@ class MainWindow(QWidget):
         with open(path, "r", encoding="utf-8") as f:
             tasks_data = json.load(f)
         for item in tasks_data:
-            task = Task(id=item["id"], text=item["text"], completed=item["completed"])
+            task = Task(
+                id=item["id"],
+                text=item["text"],
+                completed=item["completed"],
+                created_at=item.get("created_at", ""),
+            )
             self._tasks[task.id] = task
             self._insert_item(task)
