@@ -1,3 +1,6 @@
+import json
+import os
+
 from PyQt5.QtCore import Qt, QPoint, QSize
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
@@ -132,6 +135,7 @@ class MainWindow(QWidget):
 
         self._setup_ui()
         self._apply_style()
+        self._load_tasks()
 
     def _setup_ui(self):
         self.setWindowTitle(self.WINDOW_TITLE)
@@ -224,6 +228,7 @@ class MainWindow(QWidget):
         self._insert_item(task)
         self.input.clear()
         self.input.setFocus()
+        self._save_tasks()
 
     def _insert_item(self, task: Task):
         item = QListWidgetItem(self.list_widget)
@@ -239,6 +244,7 @@ class MainWindow(QWidget):
     def _on_task_toggle(self, task_id: str, completed: bool):
         if task_id in self._tasks:
             self._tasks[task_id].completed = completed
+        self._save_tasks()
 
     def _delete_task(self, task_id: str):
         # 查找并移除对应的 QListWidgetItem
@@ -249,3 +255,32 @@ class MainWindow(QWidget):
                 self.list_widget.takeItem(i)
                 break
         self._tasks.pop(task_id, None)
+        self._save_tasks()
+
+    # ── 数据持久化 ────────────────────────────
+    def _get_data_path(self) -> str:
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+        os.makedirs(data_dir, exist_ok=True)
+        return os.path.join(data_dir, "tasks.json")
+
+    def _save_tasks(self):
+        tasks_data = []
+        for task in self._tasks.values():
+            tasks_data.append({
+                "id": task.id,
+                "text": task.text,
+                "completed": task.completed,
+            })
+        with open(self._get_data_path(), "w", encoding="utf-8") as f:
+            json.dump(tasks_data, f, ensure_ascii=False, indent=2)
+
+    def _load_tasks(self):
+        path = self._get_data_path()
+        if not os.path.exists(path):
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            tasks_data = json.load(f)
+        for item in tasks_data:
+            task = Task(id=item["id"], text=item["text"], completed=item["completed"])
+            self._tasks[task.id] = task
+            self._insert_item(task)
